@@ -38,53 +38,7 @@ jobs:
         echo "My tags: $myTags"
         for theirTag in $theirTags
         do
-          doContinue=false
-          for requiredPrefix in $REQUIRED_PREFIXES
-          do
-            if [[ "$requiredPrefix" != "" && "$theirTag" != "$requiredPrefix"* ]]; then
-              echo "their tag $theirTag is missing required prefix $requiredSubstring. Skipping"
-              doContinue=true
-              break
-            fi
-          done
-          if $doContinue; then
-            continue
-          fi
-          for excludedPrefix in $EXCLUDED_PREFIXES
-          do
-            if [[ "$excludedPrefix" != "" && "$theirTag" == "$excludedPrefix"* ]]; then
-              echo $"their tag $theirTag contains excluded prefix $excludedPrefix. Skipping."
-              doContinue=true
-              break
-            fi
-          done
-          if $doContinue; then
-            continue
-          fi
-          for requiredSubstring in $REQUIRED_SUBSTRINGS
-          do
-            if [[ "$requiredSubstring" != "" && "$theirTag" != *"$requiredSubstring"* ]]; then
-              echo "their tag $theirTag is missing required subtring $requiredSubstring. Skipping"
-              doContinue=true
-              break
-            fi
-          done
-          if $doContinue; then
-            continue
-          fi
-          for excludedSubstring in $EXCLUDED_SUBSTRINGS
-          do
-            if [[ "$excludedSubstring" != "" && "$theirTag" == *"$excludedSubstring"* ]]; then
-              echo $"their tag $theirTag contains excluded subtring $excludedSubstring. Skipping."
-              doContinue=true
-              break
-            fi
-          done
-          if $doContinue; then
-            continue
-          fi
-          tagToVersion="${theirTag#$PREFIX_TO_REMOVE}"
-          tagToVersion=$(sed 's/\./-/3g' <<<$tagToVersion) # it needs to be SemVar compatible, so replace any occurances of the "." character after 3 occurances.
+          tagToVersion="$theirTag"
           if [[ "$myTags" == *"$tagToVersion"* ]]; then
             echo "Already released tag: $tagToVersion. Skipping"
             continue
@@ -109,9 +63,6 @@ jobs:
             sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$upmParentFolder"/* "$GITHUB_WORKSPACE/myRepo/"
           done
           sudo cp -a "$GITHUB_WORKSPACE/UPM-Files/." "$GITHUB_WORKSPACE/myRepo/"
-          package=$(cat package.json)
-          newPackage=$(jq --arg newVersion "$tagToVersion" '.version = $newVersion' <<<"$package")
-          echo "$newPackage" > package.json
           git add -A
           git commit -m "Format for upm" || true
           upmSHA1=$(git rev-parse $UPM_BRANCH)
@@ -122,7 +73,7 @@ jobs:
       env:
         UPM_FILES: "LICENSE README.md"
         UPM_FOLDER_CONTENTS: "Assets/Mirror/Runtime/Transport/Ignorance"
-        UPM_BRANCH: releases/upm
+        UPM_BRANCH: releases/submodule
         REQUIRED_PREFIXES: "v"
         EXCLUDED_PREFIXES: "v1.0 v1.1 v1.2.0" 
         REQUIRED_SUBSTRINGS: ""
