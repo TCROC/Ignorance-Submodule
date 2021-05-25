@@ -15,3 +15,5 @@ git submodule add https://github.com/TCROC/Ignorance-Submodule.git Assets/Submod
 cd Assets/Submodules/Ignorance
 git checkout v1.3.9.2
 ```
+
+For Mirror, see: https://github.com/TCROC/Mirror-Submodule
