@@ -13,5 +13,5 @@ For example:
 ```sh
 git submodule add https://github.com/TCROC/Ignorance-Submodule.git Assets/Submodules/Ignorance
 cd Assets/Submodules/Ignorance
-git checkout 1.3.9-2
+git checkout v1.3.9.2
 ```
