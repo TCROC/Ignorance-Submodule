@@ -1,12 +1,12 @@
-name: UPM-Tags-Nightly
+name: SUBMODULE-Tags-Nightly
 on:
   workflow_dispatch:
    schedule:
    - cron: "0 0 * * *"
 
 jobs:
-  format-upm:
-    name: Format UPM
+  format-submodule:
+    name: Format SUBMODULE
     runs-on: ubuntu-latest
     steps:
 
@@ -21,7 +21,7 @@ jobs:
         path: theirRepo
         repository:  SoftwareGuy/Ignorance 
 
-    - name: Format and push to UPM branch
+    - name: Format and push to SUBMODULE branch
       run: |
         shopt -s extglob
         git config --global user.email "github-workflow-agent@github.com"
@@ -32,8 +32,8 @@ jobs:
         theirTags=$(git tag --sort=committerdate)
         echo "Their tags: $theirTags"
         cd "$GITHUB_WORKSPACE/myRepo"
-        sudo mkdir "$GITHUB_WORKSPACE/UPM-Files"
-        sudo cp -a "$GITHUB_WORKSPACE/myRepo/UPM-Files/." "$GITHUB_WORKSPACE/UPM-Files" || true
+        sudo mkdir "$GITHUB_WORKSPACE/SUBMODULE-Files"
+        sudo cp -a "$GITHUB_WORKSPACE/myRepo/SUBMODULE-Files/." "$GITHUB_WORKSPACE/SUBMODULE-Files" || true
         myTags=$(git tag)
         echo "My tags: $myTags"
         for theirTag in $theirTags
@@ -88,37 +88,37 @@ jobs:
             echo "Already released tag: $tagToVersion. Skipping"
             continue
           fi
-          echo "Creating upm release for tag $theirTag"
+          echo "Creating submodule release for tag $theirTag"
           cd "$GITHUB_WORKSPACE/theirRepo"
           git reset --hard
           git checkout tags/$theirTag
           cd "$GITHUB_WORKSPACE/myRepo"
-          git checkout -B $UPM_BRANCH
+          git checkout -B $SUBMODULE_BRANCH
           echo "Listing their repo"
           ls "$GITHUB_WORKSPACE/theirRepo"
           sudo rm -rf !('.git'|'.gitattributes'|'.gitignore') || true
-          for upmFile in $UPM_FILES
+          for submoduleFile in $SUBMODULE_FILES
           do
-            echo "Moving file at path $GITHUB_WORKSPACE/theirRepo/$upmFile"
-            sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$upmFile" "$GITHUB_WORKSPACE/myRepo/"
+            echo "Moving file at path $GITHUB_WORKSPACE/theirRepo/$submoduleFile"
+            sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$submoduleFile" "$GITHUB_WORKSPACE/myRepo/"
           done
-          for upmParentFolder in $UPM_FOLDER_CONTENTS
+          for submoduleParentFolder in $SUBMODULE_FOLDER_CONTENTS
           do
-            echo "Moving file at path $GITHUB_WORKSPACE/theirRepo/$upmFile"
-            sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$upmParentFolder"/* "$GITHUB_WORKSPACE/myRepo/"
+            echo "Moving file at path $GITHUB_WORKSPACE/theirRepo/$submoduleFile"
+            sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$submoduleParentFolder"/* "$GITHUB_WORKSPACE/myRepo/"
           done
-          sudo cp -a "$GITHUB_WORKSPACE/UPM-Files/." "$GITHUB_WORKSPACE/myRepo/" || true
+          sudo cp -a "$GITHUB_WORKSPACE/SUBMODULE-Files/." "$GITHUB_WORKSPACE/myRepo/" || true
           git add -A
-          git commit -m "Format for upm" || true
-          upmSHA1=$(git rev-parse $UPM_BRANCH)
-          git tag -a $tagToVersion -m "UPM - Release $version" $upmSHA1
-          git push -u origin $UPM_BRANCH --follow-tags -f
-          echo "Created upm release for tag $tagToVersion"
+          git commit -m "Format for submodule" || true
+          submoduleSHA1=$(git rev-parse $SUBMODULE_BRANCH)
+          git tag -a $tagToVersion -m "SUBMODULE - Release $version" $submoduleSHA1
+          git push -u origin $SUBMODULE_BRANCH --follow-tags -f
+          echo "Created submodule release for tag $tagToVersion"
         done
       env:
-        UPM_FILES: "LICENSE README.md"
-        UPM_FOLDER_CONTENTS: "Assets/Mirror/Runtime/Transport/Ignorance"
-        UPM_BRANCH: releases/upm
+        SUBMODULE_FILES: "LICENSE README.md"
+        SUBMODULE_FOLDER_CONTENTS: "Assets/Mirror/Runtime/Transport/Ignorance"
+        SUBMODULE_BRANCH: releases/submodule
         REQUIRED_PREFIXES: "v"
         EXCLUDED_PREFIXES: "v1.0 v1.1 v1.2.0" 
         REQUIRED_SUBSTRINGS: ""
