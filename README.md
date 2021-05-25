@@ -1,113 +1,60 @@
-<p align="center">
-  <img src="http://oiran.studio/images/ignorance14.png" alt="Ignorance 1.4 Logo"/>
-</p>
+# Ignorance: A reliable UDP Transport for Mirror Networking.
 
-Ignorance 1.4 Beta
-=============
-[![Ko-Fi](https://img.shields.io/badge/Donate-Ko--Fi-red)](https://ko-fi.com/coburn) 
-[![PayPal](https://img.shields.io/badge/Donate-PayPal-blue)](https://paypal.me/coburn64) 
-[![GitHub issues](https://img.shields.io/github/issues/SoftwareGuy/Ignorance.svg)](https://github.com/SoftwareGuy/Ignorance/issues)
-![GitHub last commit](https://img.shields.io/github/last-commit/SoftwareGuy/Ignorance.svg) ![MIT Licensed](https://img.shields.io/badge/license-MIT-green.svg)
+Welcome to Ignorance, a reliable UDP Transport for Mirror Networking. Powered by the ENET C Library and ENET-C# Wrapper, it provides reliable UDP communications for your Unity projects. Just as long as they use Mirror, of course. This has been a coding project for over a good few months now. This transport is currently developed and actively used by [Oiran Studio](http://www.oiran.studio) in a few development projects.
 
-_I'd appreciate [a coffee](https://ko-fi.com/coburn) if you use this transport._
+If you feel so inclined, I'd appreciate [a coffee to keep me caffeinated](https://ko-fi.com/coburn) if you use this transport. 
 
-_"Probably the fastest transport out there for Mirror..." - FSE_Vincenzo, 2021 (Mirror Discord)_
+## Mac OS Editor Compatibility Issues
+Refer to my ticket upstream with ENET-C# [located here](https://github.com/nxrighthere/ENet-CSharp/issues/46) where the developer and I talk about the situation and workarounds. 
+When using Ignorance inside the MacOS environment, it will run in a compatibility mode to ensure things work correctly.
 
-Ignorance 1.4 is a ENet-powered transport that plugs into the [Mirror Networking](https://github.com/vis2k/Mirror) project. It provides a high-performance
-implementation of the tried and true native ENet C library which provides reliable UDP communications for your game projects. Variants of ENet are used by Triple-A
-game companies for their networking. Reliable UDP has a lot of benefits over TCP which was the default in Mirror.
+## Mirror Compatibility
+You **must** use a Mirror master snapshot. Ignorance is unlikely to work correctly with the Asset Store version of Mirror. **You need to be on Unity 2018.3.x or higher to use Ignorance 1.2.0+**
 
-Ignorance was originally intended to replace Unity's LLAPI Transport that ships with Mirror, however since it uses native libraries it was deemed too risky to ship with 
-Mirror itself.
+## Target compatibility
+- Android 32Bit ARMv7 and 64Bit ARM64, Windows x64, Mac OS x64, Linux x64 platforms are supported.
+- 32Bit Standalone targets are **not supported** as I am not able to get a DLL compiled that supports 32Bit targets. Please make sure you target 64Bit for standalone builds.
+- Tested and confirmed to work on both Unity 2018.3 and 2019.1 Beta (using the respective branches of Mirror).
 
-ENet supports a maximum of 4096 peers connected at the same time with up to 255 channels. Channels allow you to split up network communications so you can have channels
-for data that are mission critical as well as non-essential data. The native library has also been proven to be superior when compared to Unity's own LLAPI library.
+## Installation
+### Release Method
+1. Grab a release from the [releases page](https://github.com/SoftwareGuy/Ignorance/releases). They will now be packaged as UnityPackage format. You can grab a release candidate if you're feeling lucky... or maybe just brave enough to help bug test before the stable version hits the shelf.
+2. Make sure you have [Mirror](https://github.com/vis2k/Mirror) installed in your project. **Do not use** the asset store version as that one is incompatible. Use the latest auto-build and extract that into your project's folder.
+3. Unpack the Ignorance UnityPackage file by double clicking it, or importing package inside the editor.
+4. Let Unity do the dirty work.
+5. Attach IgnoranceTransport to your NetworkManager GameObject, drag the script's name to the "Transport" field of the NetworkManager. Remove any other transport scripts on that game object.
+6. You're good to go, welcome aboard!
 
-Ignorance in Action
-------------
+### Git Clone Method
+Bleeding edge, woohoo! Prepare the bandaids.
 
-Ignorance was used in a recent "Vinesauce is Hope" walking simulation demo which had multiple 
-server instances running with over 300 CCU each. [Video clips available here.](https://clips.twitch.tv/UglyColdbloodedAlfalfaAllenHuhu)
+Do the same as the release method but instead of downloading from the releases page, clone the repository and copy the Assets folder to your project root. This will install Ignorance in whatever state the code is in.
 
-What devices are supported?
-------------
+## How to use
+*Uhh, did you check the installation instructions?*
+- Add the Ignorance Transport script onto your NetworkManager game object and remove any existing ones, like Telepathy, TCP, etc. Drag the script into the Transport slot in the NetworkManager script.
+- Configure to your liking
+- You're good to go!
 
-- Desktop platforms such as Windows, Mac OS and Linux are supported out of the box along with Android and iOS. 
+## Dependencies
+- [Mirror](https://github.com/vis2k/Mirror)
+- [ENet-CSharp](https://github.com/nxrighthere/ENet-CSharp)
+- ENET itself. As in the C library.
 
-- Consoles are hit and miss, since they run on slimmed down operating systems.
+## I have a bug.
+[Report the sucker here.](https://github.com/SoftwareGuy/Ignorance/issues) Please provide as much detail as possible, bugs that cannot be replicated will be flagged as invalid.
 
-- If ENet can run on it and it's supported by Unity, you're good with Ignorance.
+## I have questions, I want answers.
+[You're welcome.](https://vis2k.github.io/Mirror/Transports/Ignorance)
 
-For more info, see the FAQ.
-
-
-Dependencies
-------------
-
-Please note that the repository doesn't include Mirror, instead it only provides you the Ignorance code.
-
-Make sure you have Mirror installed and up to date before installing Ignorance.
-
--   [ENet-CSharp](https://github.com/SoftwareGuy/ENet-CSharp): **slightly modified version included**
-
--   [Mirror Networking](https://github.com/vis2k/Mirror): use Asset Store release please, only use Git Master release for bug fixes that you desperately need
-
-Installation
-------------
-
-Download the Unity Package from Releases that is the latest one. Simply import
-the Unity Package and Unity will do the rest. Follow the instructions below.
-
-How to use
-----------
-
-I have included a pre-configured sample scene so you can get started easily. Otherwise add the script 
-called **Ignorance** to your NetworkManager object, removing any TCP-based or other UDP-based transport. 
-Then set the script to be used in NetworkManagers' "Transport" field.
-
-FAQ (aka Please Read This First)
---------------------------------
-
-See [FAQ.md](https://github.com/SoftwareGuy/Ignorance/blob/master/FAQ.md).
-
-I found a bug, where do I report it?
---------------------------------
-[Check the current open bug reports and/or report a new one here](https://github.com/SoftwareGuy/Ignorance/issues).
-
-Failing that you can always ping me in the Mirror Discord and I'll reply as soon as I can. Don't **excessively** ping me or you'll suffer my wrath. 
-
-Bugs that do not have enough details will be closed with \#wontfix. Details like your OS, Unity Editor version, any Ignorance errors, etc is essential for a good
-bug report.
-
-### I have other questions, I want answers.
-
-[Here's a quick primer.](https://vis2k.github.io/Mirror/Transports/Ignorance). It might be slightly out of date, but it covers the basics of Ignorance.
-
-
-Credits
--------
-
--   **Donators**: Thanks for helping keep the lights on.
-
--	[FSE_Vincenzo](https://github.com/Vincenz099): Resident master of the ENet way. They are part of Flying Squirrel Entertainment - go check their games out.
-	
--	[JesusLuvsYooh](https://github.com/JesusLuvsYooh) : CCU endurance testing project, ideas, fixes and other awesome stuff
-
--   [Katori](https://github.com/katori): Helped kickstart the threaded version that evolved into short-lived Ignorance 2.x version, which later became 
-	Ignorance Threaded.
-
--   [BigBoxVR](https://github.com/GabeBigBoxVR): Pull requests and found a race condition that threatened stability. Also uses Ignorance in Population One, a VR title.
-
--   [Martin](https://github.com/martindevans): Pull requests, testing with Dissonance. Great VoIP asset for Unity.
-
--   [vis2k](https://github.com/vis2k) and [Paul](https://github.com/paulpach): Mirror and MirrorNG developers respectively.
-
--   [c6burns](https://github.com/c6burns), [Petris](https://github.com/MichalPetryka), [shiena](https://github.com/shiena), [Draknith](https://github.com/FizzCube): Former buddies that helped a lot.
-
--   [nxrighthere](https://github.com/nxrighthere): Author of ENet-CSharp in which I forked and made custom improvements to it.
-
--   The Mirror Discord and the others who I have missed. Thanks a lot, you know who you are.
-
--   You too can have your name here if you send in a PR. Don't delay, get your PR in today!
-
-**To be continued...?**
+## Credits
+- **Coffee Donators**: Thank you so much.
+- **[Petris](https://github.com/MichalPetryka)**: Code refactoring and tidy up (you rock man!)
+- **[BigBoxVR](https://github.com/GabeBigBoxVR)**: Pull requests.
+- **[nxrighthere](https://github.com/nxrighthere)**: Helped debug some things.
+- **[Draknith](https://github.com/FizzCube)**: Testing and mapping Reliable/Unreliable channels in Mirror to ENET Channels, testing.
+- **[vis2k](https://github.com/vis2k)** and **[Paul](https://github.com/paulpach)**: Mirror lead developers.
+- **[shiena](https://github.com/shiena)**: Pull requests for bug fixes and oversights.
+- **The folks at the Mirror discord**: Memes, Courage, LOLs, drama and all-round awesome folks to chat with.
+- To all the others who I have missed. Thanks a lot, you know who you are.
+- You too can have your name here if you send in a PR. Don't delay, get your PR in today!

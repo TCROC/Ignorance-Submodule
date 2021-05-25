@@ -5,11 +5,8 @@ PluginImporter:
   serializedVersion: 2
   iconMap: {}
   executionOrder: {}
-  defineConstraints: []
   isPreloaded: 0
   isOverridable: 0
-  isExplicitlyReferenced: 0
-  validateReferences: 1
   platformData:
   - first:
       '': Any
@@ -25,7 +22,6 @@ PluginImporter:
         Exclude WebGL: 1
         Exclude Win: 1
         Exclude Win64: 0
-        Exclude iOS: 1
   - first:
       Android: Android
     second:
@@ -42,9 +38,9 @@ PluginImporter:
     second:
       enabled: 1
       settings:
-        CPU: AnyCPU
+        CPU: x86_64
         DefaultValueInitialized: true
-        OS: AnyOS
+        OS: Windows
   - first:
       Facebook: Win
     second:
@@ -98,14 +94,6 @@ PluginImporter:
     second:
       enabled: 0
       settings: {}
-  - first:
-      iPhone: iOS
-    second:
-      enabled: 0
-      settings:
-        AddToEmbeddedBinaries: false
-        CompileFlags: 
-        FrameworkDependencies: 
   userData: 
   assetBundleName: 
   assetBundleVariant: 
