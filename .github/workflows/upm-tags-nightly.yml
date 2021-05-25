@@ -109,9 +109,6 @@ jobs:
             sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$submoduleParentFolder"/* "$GITHUB_WORKSPACE/myRepo/"
           done
           sudo cp -a "$GITHUB_WORKSPACE/SUBMODULE-Files/." "$GITHUB_WORKSPACE/myRepo/"
-          package=$(cat package.json)
-          newPackage=$(jq --arg newVersion "$tagToVersion" '.version = $newVersion' <<<"$package")
-          echo "$newPackage" > package.json
           git add -A
           git commit -m "Format for submodule" || true
           submoduleSHA1=$(git rev-parse $SUBMODULE_BRANCH)
