@@ -33,7 +33,7 @@ jobs:
         echo "Their tags: $theirTags"
         cd "$GITHUB_WORKSPACE/myRepo"
         sudo mkdir "$GITHUB_WORKSPACE/SUBMODULE-Files"
-        sudo cp -a "$GITHUB_WORKSPACE/myRepo/SUBMODULE-Files/." "$GITHUB_WORKSPACE/SUBMODULE-Files" || true
+        sudo cp -a "$GITHUB_WORKSPACE/myRepo/SUBMODULE-Files/." "$GITHUB_WORKSPACE/SUBMODULE-Files"
         myTags=$(git tag)
         echo "My tags: $myTags"
         for theirTag in $theirTags
@@ -83,7 +83,8 @@ jobs:
           if $doContinue; then
             continue
           fi
-          tagToVersion="$theirTag"
+          tagToVersion="${theirTag#$PREFIX_TO_REMOVE}"
+          tagToVersion=$(sed 's/\./-/3g' <<<$tagToVersion) # it needs to be SemVar compatible, so replace any occurances of the "." character after 3 occurances.
           if [[ "$myTags" == *"$tagToVersion"* ]]; then
             echo "Already released tag: $tagToVersion. Skipping"
             continue
@@ -107,7 +108,10 @@ jobs:
             echo "Moving file at path $GITHUB_WORKSPACE/theirRepo/$submoduleFile"
             sudo mv -v "$GITHUB_WORKSPACE/theirRepo/$submoduleParentFolder"/* "$GITHUB_WORKSPACE/myRepo/"
           done
-          sudo cp -a "$GITHUB_WORKSPACE/SUBMODULE-Files/." "$GITHUB_WORKSPACE/myRepo/" || true
+          sudo cp -a "$GITHUB_WORKSPACE/SUBMODULE-Files/." "$GITHUB_WORKSPACE/myRepo/"
+          package=$(cat package.json)
+          newPackage=$(jq --arg newVersion "$tagToVersion" '.version = $newVersion' <<<"$package")
+          echo "$newPackage" > package.json
           git add -A
           git commit -m "Format for submodule" || true
           submoduleSHA1=$(git rev-parse $SUBMODULE_BRANCH)
