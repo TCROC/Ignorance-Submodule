@@ -1,3 +1,9 @@
+// Ignorance 1.4.x LTS (Long Term Support)
+// https://github.com/SoftwareGuy/Ignorance
+// -----------------
+// Copyright (c) 2019 - 2021 Matt Coburn (SoftwareGuy/Coburn64)
+// Ignorance is licensed under the MIT license. Refer
+// to the LICENSE file for more information.
 #if UNITY_EDITOR
 using System.Collections.Generic;
 using System.Linq;
@@ -12,6 +18,7 @@ namespace IgnoranceTransport
     [InitializeOnLoad]
     public class AddIgnoranceDefine : Editor
     {
+        private static bool debugMode = false;
         private static string existingDefines = string.Empty;
 
         /// <summary>
@@ -28,7 +35,9 @@ namespace IgnoranceTransport
         /// </summary>
         public static readonly string[] DoNotRemoveTheseSymbols = new string[]
         {
-            "IGNORANCE_NO_UPNP",
+            "IGNORANCE",
+            "IGNORANCE_1",
+            "IGNORANCE_1_4",
             "IGNORANCE_MIRROR_POLLING"
         };
 
@@ -67,6 +76,9 @@ namespace IgnoranceTransport
         {
             foreach(string s in DoNotRemoveTheseSymbols)
             {
+                if(debugMode)
+                    UnityEngine.Debug.Log($"{s.Trim()} matches blacklist");
+
                 if (s == symbol.Trim()) return true;
             }
 
@@ -75,7 +87,14 @@ namespace IgnoranceTransport
 
         static bool IsSafeToRemove (string input)
         {
-            if (input.StartsWith("IGNORANCE") && !DoesSymbolExistInBlacklist(input)) return true;
+            if (input.StartsWith("IGNORANCE") && !DoesSymbolExistInBlacklist(input))
+            {
+                if (debugMode)
+                    UnityEngine.Debug.Log($"{input.Trim()} is safe to remove");
+
+                return true;
+            }
+
             return false;
         }
     }

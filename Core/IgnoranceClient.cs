@@ -1,22 +1,21 @@
-// Ignorance 1.4.x
-// Ignorance. It really kicks the Unity LLAPIs ass.
+// Ignorance 1.4.x LTS (Long Term Support)
 // https://github.com/SoftwareGuy/Ignorance
 // -----------------
-// Copyright (c) 2019 - 2020 Matt Coburn (SoftwareGuy/Coburn64)
-// Ignorance Transport is licensed under the MIT license. Refer
+// Copyright (c) 2019 - 2021 Matt Coburn (SoftwareGuy/Coburn64)
+// Ignorance is licensed under the MIT license. Refer
 // to the LICENSE file for more information.
 
-using ENet;
-// using NetStack.Buffers;
 using System;
 using System.Collections.Concurrent;
 using System.Threading;
+using ENet;
+using IgnoranceThirdparty;
 using UnityEngine;
 using Event = ENet.Event;           // fixes CS0104 ambigous reference between the same thing in UnityEngine
 using EventType = ENet.EventType;   // fixes CS0104 ambigous reference between the same thing in UnityEngine
 using Object = System.Object;       // fixes CS0104 ambigous reference between the same thing in UnityEngine
 
-namespace IgnoranceTransport
+namespace IgnoranceCore
 {
     public class IgnoranceClient
     {
@@ -31,13 +30,15 @@ namespace IgnoranceTransport
         public int MaximumPacketSize = 33554432;
         // General Verbosity by default.
         public int Verbosity = 1;
-
+        // Maximum ring buffer capacity.
+        public int IncomingOutgoingBufferSize = 5000;
+        public int ConnectionEventBufferSize = 100;
         // Queues
-        public ConcurrentQueue<IgnoranceIncomingPacket> Incoming = new ConcurrentQueue<IgnoranceIncomingPacket>();
-        public ConcurrentQueue<IgnoranceOutgoingPacket> Outgoing = new ConcurrentQueue<IgnoranceOutgoingPacket>();
-        public ConcurrentQueue<IgnoranceCommandPacket> Commands = new ConcurrentQueue<IgnoranceCommandPacket>();
-        public ConcurrentQueue<IgnoranceConnectionEvent> ConnectionEvents = new ConcurrentQueue<IgnoranceConnectionEvent>();
-        public ConcurrentQueue<IgnoranceClientStats> StatusUpdates = new ConcurrentQueue<IgnoranceClientStats>();
+        public RingBuffer<IgnoranceIncomingPacket> Incoming;
+        public RingBuffer<IgnoranceOutgoingPacket> Outgoing;
+        public RingBuffer<IgnoranceCommandPacket> Commands;
+        public RingBuffer<IgnoranceConnectionEvent> ConnectionEvents;
+        public RingBuffer<IgnoranceClientStats> StatusUpdates;
 
         public bool IsAlive => WorkerThread != null && WorkerThread.IsAlive;
 
@@ -46,14 +47,15 @@ namespace IgnoranceTransport
 
         public void Start()
         {
-            Debug.Log("IgnoranceClient.Start()");
-
             if (WorkerThread != null && WorkerThread.IsAlive)
             {
                 // Cannot do that.
-                Debug.LogError("A worker thread is already running. Cannot start another.");
+                Debug.LogError("Ignorance Client: A worker thread is already running. Cannot start another.");
                 return;
             }
+
+            // Setup the ring buffers.
+            SetupRingBuffersIfNull();
 
             CeaseOperation = false;
             ThreadParamInfo threadParams = new ThreadParamInfo()
@@ -76,15 +78,20 @@ namespace IgnoranceTransport
             WorkerThread = new Thread(ThreadWorker);
             WorkerThread.Start(threadParams);
 
-            Debug.Log("Client has dispatched worker thread.");
+            Debug.Log("Ignorance Client: Dispatched worker thread.");
         }
 
         public void Stop()
         {
-            Debug.Log("Telling client thread to stop, this may take a while depending on network load");
-            CeaseOperation = true;
+            if (WorkerThread != null && !CeaseOperation)
+            {
+                Debug.Log("Ignorance Client: Stop acknowledged. This may take a while depending on network load...");
+
+                CeaseOperation = true;
+            }
         }
 
+        #region The meat and potatoes.
         // This runs in a seperate thread, be careful accessing anything outside of it's thread
         // or you may get an AccessViolation/crash.
         private void ThreadWorker(Object parameters)
@@ -94,30 +101,27 @@ namespace IgnoranceTransport
 
             ThreadParamInfo setupInfo;
             Address clientAddress = new Address();
-            Peer clientPeer;
-            Host clientENetHost;
-            Event clientENetEvent;
+            Peer clientPeer;        // The peer object that represents the client's connection.
+            Host clientHost;        // NOT related to Mirror "Client Host". This is the client's ENet Host Object.
+            Event clientEvent;      // Used when clients get events on the network.
             IgnoranceClientStats icsu = default;
+            bool alreadyNotifiedAboutDisconnect = false;
 
             // Grab the setup information.
             if (parameters.GetType() == typeof(ThreadParamInfo))
-            {
                 setupInfo = (ThreadParamInfo)parameters;
-            }
             else
             {
-                Debug.LogError("Ignorance Client: Startup failure: Invalid thread parameters. Aborting.");
+                Debug.LogError("Ignorance Client: Startup failure; Invalid thread parameters. Aborting.");
                 return;
             }
 
             // Attempt to initialize ENet inside the thread.
             if (Library.Initialize())
-            {
-                Debug.Log("Ignorance Client: ENet initialized.");
-            }
+                Debug.Log("Ignorance Client: ENet Native successfully initialized.");
             else
             {
-                Debug.LogError("Ignorance Client: Failed to initialize ENet. This threads' fucked.");
+                Debug.LogError("Ignorance Client: Failed to initialize ENet Native. Aborting.");
                 return;
             }
 
@@ -125,29 +129,34 @@ namespace IgnoranceTransport
             clientAddress.SetHost(setupInfo.Address);
             clientAddress.Port = (ushort)setupInfo.Port;
 
-            using (clientENetHost = new Host())
+            using (clientHost = new Host())
             {
-                // TODO: Maybe try catch this
-                clientENetHost.Create();
-                clientPeer = clientENetHost.Connect(clientAddress, setupInfo.Channels);
+                try
+                {
+                    clientHost.Create();
+                    clientPeer = clientHost.Connect(clientAddress, setupInfo.Channels);
+                }
+                catch (Exception ex)
+                {
+                    // Oops, something failed.
+                    Debug.LogError($"Ignorance Client: Looks like something went wrong. While attempting to create client object, we caught an exception:\n{ex.Message}");
+                    Debug.LogError($"You could try the debug-enabled version of the native ENet library which creates a logfile, or alternatively you could try restart " +
+                        $"your device to ensure jank is cleared out of memory. If problems persist, please file a support ticket explaining what happened.");
 
+                    Library.Deinitialize();
+                    return;
+                }
+
+                // Process network events as long as we're not ceasing operation.
                 while (!CeaseOperation)
                 {
                     bool pollComplete = false;
 
-                    // Step 0: Handle commands.
-                    while (Commands.TryDequeue(out IgnoranceCommandPacket commandPacket))
+                    while (Commands.TryDequeue(out IgnoranceCommandPacket ignoranceCommandPacket))
                     {
-                        switch (commandPacket.Type)
+                        switch (ignoranceCommandPacket.Type)
                         {
-                            default:
-                                break;
-
-                            case IgnoranceCommandType.ClientWantsToStop:
-                                CeaseOperation = true;
-                                break;
-
-                            case IgnoranceCommandType.ClientRequestsStatusUpdate:
+                            case IgnoranceCommandType.ClientStatusRequest:
                                 // Respond with statistics so far.
                                 if (!clientPeer.IsSet)
                                     break;
@@ -157,16 +166,24 @@ namespace IgnoranceTransport
                                 icsu.BytesReceived = clientPeer.BytesReceived;
                                 icsu.BytesSent = clientPeer.BytesSent;
 
-                                icsu.PacketsReceived = clientENetHost.PacketsReceived;
+                                icsu.PacketsReceived = clientHost.PacketsReceived;
                                 icsu.PacketsSent = clientPeer.PacketsSent;
                                 icsu.PacketsLost = clientPeer.PacketsLost;
 
                                 StatusUpdates.Enqueue(icsu);
                                 break;
+
+                            case IgnoranceCommandType.ClientWantsToStop:
+                                CeaseOperation = true;
+                                break;
                         }
                     }
-                    // Step 1: Send out data.
-                    // ---> Sending to Server
+
+                    // If something outside the thread has told us to stop execution, then we need to break out of this while loop.
+                    if (CeaseOperation)
+                        break;
+
+                    // Step 1: Sending to Server
                     while (Outgoing.TryDequeue(out IgnoranceOutgoingPacket outgoingPacket))
                     {
                         // TODO: Revise this, could we tell the Peer to disconnect right here?                       
@@ -176,11 +193,15 @@ namespace IgnoranceTransport
                         int ret = clientPeer.Send(outgoingPacket.Channel, ref outgoingPacket.Payload);
 
                         if (ret < 0 && setupInfo.Verbosity > 0)
-                            Debug.LogWarning($"Ignorance Client: ENet error code {ret} while sending packet to Peer {outgoingPacket.NativePeerId}.");
+                            Debug.LogWarning($"Ignorance Client: ENet error {ret} while sending packet to Server via Peer {outgoingPacket.NativePeerId}.");
                     }
 
-                    // Step 2:
-                    // <----- Receive Data packets
+                    // If something outside the thread has told us to stop execution, then we need to break out of this while loop.
+                    // while loop to break out of is while(!CeaseOperation).
+                    if (CeaseOperation)
+                        break;
+
+                    // Step 2: Receive Data packets
                     // This loops until polling is completed. It may take a while, if it's
                     // a slow networking day.
                     while (!pollComplete)
@@ -190,28 +211,32 @@ namespace IgnoranceTransport
                         int incomingPacketLength;
 
                         // Any events worth checking out?
-                        if (clientENetHost.CheckEvents(out clientENetEvent) <= 0)
+                        if (clientHost.CheckEvents(out clientEvent) <= 0)
                         {
                             // If service time is met, break out of it.
-                            if (clientENetHost.Service(setupInfo.PollTime, out clientENetEvent) <= 0) break;
+                            if (clientHost.Service(setupInfo.PollTime, out clientEvent) <= 0) break;
 
                             // Poll is done.
                             pollComplete = true;
                         }
 
                         // Setup the packet references.
-                        incomingPeer = clientENetEvent.Peer;
+                        incomingPeer = clientEvent.Peer;
 
                         // Now, let's handle those events.
-                        switch (clientENetEvent.Type)
+                        switch (clientEvent.Type)
                         {
                             case EventType.None:
                             default:
                                 break;
 
                             case EventType.Connect:
-                                ConnectionEvents.Enqueue(new IgnoranceConnectionEvent()
+                                if (setupInfo.Verbosity > 0)
+                                    Debug.Log("Ignorance Client: ENet has connected to the server.");
+
+                                ConnectionEvents.Enqueue(new IgnoranceConnectionEvent
                                 {
+                                    EventType = 0x00,
                                     NativePeerId = incomingPeer.ID,
                                     IP = incomingPeer.IP,
                                     Port = incomingPeer.Port
@@ -220,16 +245,17 @@ namespace IgnoranceTransport
 
                             case EventType.Disconnect:
                             case EventType.Timeout:
-                                ConnectionEvents.Enqueue(new IgnoranceConnectionEvent()
-                                {
-                                    WasDisconnect = true
-                                });
-                                break;
+                                if (setupInfo.Verbosity > 0)
+                                    Debug.Log("Ignorance Client: ENet has been disconnected from the server.");
 
+                                ConnectionEvents.Enqueue(new IgnoranceConnectionEvent { EventType = 0x01 });
+                                CeaseOperation = true;
+                                alreadyNotifiedAboutDisconnect = true;
+                                break;
 
                             case EventType.Receive:
                                 // Receive event type usually includes a packet; so cache its reference.
-                                incomingPacket = clientENetEvent.Packet;
+                                incomingPacket = clientEvent.Packet;
 
                                 if (!incomingPacket.IsSet)
                                 {
@@ -252,7 +278,7 @@ namespace IgnoranceTransport
 
                                 IgnoranceIncomingPacket incomingQueuePacket = new IgnoranceIncomingPacket
                                 {
-                                    Channel = clientENetEvent.ChannelID,
+                                    Channel = clientEvent.ChannelID,
                                     NativePeerId = incomingPeer.ID,
                                     Payload = incomingPacket
                                 };
@@ -261,27 +287,56 @@ namespace IgnoranceTransport
                                 break;
                         }
                     }
+
+                    // If something outside the thread has told us to stop execution, then we need to break out of this while loop.
+                    // while loop to break out of is while(!CeaseOperation).
+                    if (CeaseOperation)
+                        break;
                 }
 
-                Debug.Log("Ignorance Server: Shutdown commencing, disconnecting and flushing connection.");
+                Debug.Log("Ignorance Client: Thread shutdown commencing. Disconnecting and flushing connection.");
 
                 // Flush the client and disconnect.
                 clientPeer.Disconnect(0);
-                clientENetHost.Flush();
+                clientHost.Flush();
 
                 // Fix for client stuck in limbo, since the disconnection event may not be fired until next loop.
-                ConnectionEvents.Enqueue(new IgnoranceConnectionEvent()
+                if (!alreadyNotifiedAboutDisconnect)
                 {
-                    WasDisconnect = true
-                });
+                    ConnectionEvents.Enqueue(new IgnoranceConnectionEvent { EventType = 0x01 });
+                    alreadyNotifiedAboutDisconnect = true;
+                }
+
             }
+
+            // Fix for client stuck in limbo, since the disconnection event may not be fired until next loop, again.
+            if (!alreadyNotifiedAboutDisconnect)
+                ConnectionEvents.Enqueue(new IgnoranceConnectionEvent { EventType = 0x01 });
 
             // Deinitialize
             Library.Deinitialize();
+
             if (setupInfo.Verbosity > 0)
                 Debug.Log("Ignorance Client: Shutdown complete.");
         }
+        #endregion
 
+        private void SetupRingBuffersIfNull()
+        {
+            Debug.Log($"Ignorance: Setting up ring buffers if they're not already created. " +
+                $"If they are already, this step will be skipped.");
+
+            if (Incoming == null)
+                Incoming = new RingBuffer<IgnoranceIncomingPacket>(IncomingOutgoingBufferSize);
+            if (Outgoing == null)
+                Outgoing = new RingBuffer<IgnoranceOutgoingPacket>(IncomingOutgoingBufferSize);
+            if (Commands == null)
+                Commands = new RingBuffer<IgnoranceCommandPacket>(100);
+            if (ConnectionEvents == null)
+                ConnectionEvents = new RingBuffer<IgnoranceConnectionEvent>(ConnectionEventBufferSize);
+            if (StatusUpdates == null)
+                StatusUpdates = new RingBuffer<IgnoranceClientStats>(10);
+        }
 
         private struct ThreadParamInfo
         {
